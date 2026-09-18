@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Alba",
+      "hasCanvas": false,
+      "bodyTextLen": 1627,
+      "bodyTextHash": "4e6c9c2bf5a93a2f7fcd4c77ad00424153b70770ebee4e3ceb46177968300116",
+      "bodyTextPrefix": "A Alba Studio CLEANING STUDIO · LEAD ENGINE The homes that need ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Alba",
+      "hasCanvas": false,
+      "bodyTextLen": 1620,
+      "bodyTextHash": "d65d496f00a3b88fd30d59b669ee2da16eb85529105c82ecc676a15b993a35cc",
+      "bodyTextPrefix": "A Alba CLEANING STUDIO · LEAD ENGINE The homes that need you, ma",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
