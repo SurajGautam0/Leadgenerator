@@ -5,6 +5,7 @@ import { getSql } from "@/lib/db";
 import type { Lead, LeadStats, LeadStatus, ScrapeJob, VerticalId } from "./leads-types";
 import { LEAD_STATUSES, VERTICALS } from "./leads-types";
 import { fallbackMarketBrief, generateProspects } from "./generate-leads";
+import { assertRateLimit } from "./rate-limit";
 import { runPublicScrape } from "./scrape";
 
 type LeadRow = {
@@ -240,6 +241,7 @@ export const generateLeads = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => generateInput.parse(input))
   .handler(async ({ context, data }) => {
+    assertRateLimit(context.userId, "generate", 10, 60_000);
     const prospects = generateProspects(data.location, data.count ?? 10, data.service);
     const sql = await getSql();
     const inserted: Lead[] = [];
@@ -260,6 +262,7 @@ export const scrapeLeads = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => scrapeInput.parse(input))
   .handler(async ({ context, data }) => {
+    assertRateLimit(context.userId, "scrape", 3, 60_000);
     const allowed = new Set(VERTICALS.map((v) => v.id));
     const verticals = data.verticals.filter((v): v is VerticalId => allowed.has(v as VerticalId));
     const result = await runPublicScrape({

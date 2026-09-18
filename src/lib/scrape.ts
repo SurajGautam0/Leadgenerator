@@ -105,6 +105,110 @@ async function fetchText(url: string, timeoutMs: number) {
   }
 }
 
+async function isPublicUrl(rawUrl: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    hostname === "metadata.google.internal"
+  ) {
+    return false;
+  }
+
+  let isIP: (value: string) => number;
+  let addresses: string[];
+  try {
+    const net = await import("node:net");
+    isIP = net.isIP;
+    if (isIP(hostname)) {
+      addresses = [hostname];
+    } else {
+      const { lookup } = await import("node:dns/promises");
+      addresses = (await lookup(hostname, { all: true, verbatim: true })).map(
+        (entry) => entry.address,
+      );
+    }
+  } catch {
+    return false;
+  }
+
+  const isPrivateIpv4 = (address: string) => {
+    const octets = address.split(".").map(Number);
+    if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet))) return true;
+    const [first, second] = octets;
+    return (
+      first === 0 ||
+      first === 10 ||
+      first === 127 ||
+      (first === 100 && second >= 64 && second <= 127) ||
+      (first === 169 && second === 254) ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && second === 168) ||
+      (first === 198 && (second === 18 || second === 19)) ||
+      first >= 224
+    );
+  };
+
+  return addresses.length > 0 && addresses.every((address) => {
+    if (isIP(address) === 6) {
+      const normalized = address.toLowerCase();
+      if (normalized.startsWith("::ffff:")) {
+        return !isPrivateIpv4(normalized.slice(7));
+      }
+      return !(
+        normalized === "::1" ||
+        normalized.startsWith("fc") ||
+        normalized.startsWith("fd") ||
+        normalized.startsWith("fe8") ||
+        normalized.startsWith("fe9") ||
+        normalized.startsWith("fea") ||
+        normalized.startsWith("feb")
+      );
+    }
+    return !isPrivateIpv4(address);
+  });
+}
+
+async function fetchPublicText(url: string, timeoutMs: number) {
+  let currentUrl = url;
+  for (let redirect = 0; redirect <= 3; redirect += 1) {
+    if (!(await isPublicUrl(currentUrl))) return "";
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(currentUrl, {
+        headers: { "User-Agent": UA, Accept: "text/html,application/json" },
+        signal: ctrl.signal,
+        redirect: "manual",
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get("location");
+        if (!location) return "";
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+      if (!res.ok) return "";
+      const buf = await res.arrayBuffer();
+      if (buf.byteLength > 400_000) return "";
+      return new TextDecoder("utf-8", { fatal: false }).decode(buf);
+    } catch {
+      return "";
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return "";
+}
+
 async function geocode(location: string) {
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(location)}`;
   const text = await fetchText(url, 8000);
@@ -172,7 +276,7 @@ function valueFor(vertical: VerticalId) {
 }
 
 async function crawlSite(website: string) {
-  const html = await fetchText(website, 7000);
+  const html = await fetchPublicText(website, 7000);
   if (!html) return { email: "", phone: "", crawled: false };
   return {
     email: extractEmails(html)[0] ?? "",
